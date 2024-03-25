@@ -1,0 +1,299 @@
+#
+# This is the Graph Definition for the Concierge Catalog sub-graph
+#
+graph:
+
+  category-hierarchy:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.concierge.legion.rule.catalog.CategoryHierarchyRule
+    input-streams:
+      emodb-category: $universe.legion.$region.megabus.category.avro
+    output-streams:
+      output-stream: $universe.concierge.$region.concierge-catalog.category-hierarchy.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+    config:
+      suppress-duration: 30
+
+  concierge-brand:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.concierge.legion.rule.catalog.ConciergeBrandRule
+    input-streams:
+      emodb-brand: $universe.legion.$region.megabus.brand.avro
+    output-streams:
+      output-stream: $universe.concierge.$region.concierge-catalog.brands.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  concierge-category:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.concierge.legion.rule.catalog.ConciergeCategoryRule
+    input-streams:
+      category-hierarchy: $universe.concierge.$region.concierge-catalog.category-hierarchy.avro
+      emodb-category: $universe.legion.$region.megabus.category.avro
+    output-streams:
+      output-stream: $universe.concierge.$region.concierge-catalog.categories.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+
+  # PD-208597: Part of alternate graph.
+  # The next 2 rules decompose `concierge-product-v2`
+  concierge-product-counts:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.concierge.legion.rule.catalog.product.ConciergeProductCountsRule
+    input-streams:
+      questions-approved-count-by-product: $universe.legion.$region.shared.questions-approved-count-by-product.avro
+      answers-approved-count-by-subject: $universe.legion.$region.shared.answers-approved-count-by-subject.avro
+      product-stats-by-reviews: $universe.legion.$region.shared.product-stats-by-reviews.avro
+    output-streams:
+      output-stream: $universe.concierge.$region.concierge-catalog.product-counts.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  concierge-product-packager:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.concierge.legion.rule.catalog.product.ConciergeProductPackagerRule
+    input-streams:
+      product-counts:     $universe.concierge.$region.concierge-catalog.product-counts.avro.$suffix
+      category-hierarchy: $universe.concierge.$region.concierge-catalog.category-hierarchy.avro.$suffix
+      product-catalog-package: $universe.legion.$region.shared.product-catalogs.avro
+    output-streams:
+      output-stream: $universe.concierge.$region.concierge-catalog.product-package.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  megabus-splitter-catalog:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.emodb.splitter.EmodbMegabusSplitter
+    input-streams:
+      input-stream: $universe.emodb.$region.megabus
+    output-streams:
+      emodb-brand: $universe.legion.$region.megabus.brand.avro.$suffix
+      emodb-product: $universe.legion.$region.megabus.product.avro.$suffix
+      emodb-category: $universe.legion.$region.megabus.category.avro.$suffix
+    config:
+      emodb-brand: com.bazaarvoice.legion.rule.emodb.EmodbBrandFilter
+      emodb-product: com.bazaarvoice.legion.rule.emodb.EmodbProductFilter
+      emodb-category: com.bazaarvoice.legion.rule.emodb.EmodbCategoryFilter
+    streams-config:
+      num.stream.threads: 2
+
+  product-catalog-packager:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.ProductCatalogPackager
+    input-streams:
+      emodb-brand   : $universe.legion.$region.megabus.brand.avro
+      emodb-product : $universe.legion.$region.megabus.product.avro
+      emodb-category: $universe.legion.$region.megabus.category.avro
+    output-streams:
+      output-stream:  $universe.legion.$region.shared.product-catalogs.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+      max.warmup.replicas: 4
+
+  # Rekeys the Contributor stream such that its key is the review-coord
+  contributor-by-review:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.RekeyContributorByReviewRule
+    input-streams:
+      emodb-contributor: $universe.legion.$region.megabus.contributor.avro
+      emodb-review:      $universe.legion.$region.megabus.review.avro
+    output-streams:
+      output-stream:     $universe.legion.$region.shared.contributor-by-review.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Rekeys the Contributor stream such that its key is the question-coord
+  contributor-by-question:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.RekeyContributorByQuestionRule
+    input-streams:
+      emodb-contributor: $universe.legion.$region.megabus.contributor.avro
+      emodb-question: $universe.legion.$region.megabus.question.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.contributor-by-question.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Rekeys the Contributor stream such that its key is the answer-coord
+  contributor-by-answer:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.RekeyContributorByAnswerRule
+    input-streams:
+      emodb-contributor: $universe.legion.$region.megabus.contributor.avro
+      emodb-answer: $universe.legion.$region.megabus.answer.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.contributor-by-answer.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Rekeys the Contributor stream such that its key is the comment-coord
+  contributor-by-comment:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.RekeyContributorByCommentRule
+    input-streams:
+      emodb-contributor: $universe.legion.$region.megabus.contributor.avro
+      emodb-comment: $universe.legion.$region.megabus.comment.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.contributor-by-comment.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Rekeys the Emodb Statistics stream such that its key is the review-coord
+  statistics-by-content-type:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.stats.StatisticsByContentTypeSplitter
+    input-streams:
+      emodb-statistics:  $universe.legion.$region.megabus.statistics.avro
+    output-streams:
+      statistics-by-review:   $universe.legion.$region.shared.statistics-by-review.avro.$suffix
+      statistics-by-question: $universe.legion.$region.shared.statistics-by-question.avro.$suffix
+      statistics-by-answer:   $universe.legion.$region.shared.statistics-by-answer.avro.$suffix
+      statistics-by-comment:  $universe.legion.$region.shared.statistics-by-comment.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved comments by review
+  comments-approved-count-by-review:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.CommentsApprovedCountByReviewRule
+    input-streams:
+      emodb-comment: $universe.legion.$region.megabus.comment.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.comments-approved-count-by-review.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved review by contributor
+  reviews-approved-count-by-contributor:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.ReviewsApprovedCountByContributorRule
+    input-streams:
+      emodb-review: $universe.legion.$region.megabus.review.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.reviews-approved-count-by-contributor.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved questions by contributor
+  questions-approved-count-by-contributor:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.QuestionsApprovedCountByContributorRule
+    input-streams:
+      emodb-question: $universe.legion.$region.megabus.question.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.questions-approved-count-by-contributor.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved answers by contributor
+  answers-approved-count-by-contributor:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.AnswersApprovedCountByContributorRule
+    input-streams:
+      emodb-answer: $universe.legion.$region.megabus.answer.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.answers-approved-count-by-contributor.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved questions by product
+  questions-approved-count-by-product:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.QuestionsApprovedCountByProductRule
+    input-streams:
+      emodb-question: $universe.legion.$region.megabus.question.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.questions-approved-count-by-product.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  answers-approved-count-by-subject:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.count.AnswersApprovedCountBySubjectRule
+    input-streams:
+      emodb-question: $universe.legion.$region.megabus.question.avro
+      emodb-answer: $universe.legion.$region.megabus.answer.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.answers-approved-count-by-subject.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Produces a count of approved reviews and average rating by product
+  product-stats-by-reviews:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.stats.ProductStatsFromReviewsRule
+    input-streams:
+      emodb-review: $universe.legion.$region.megabus.review.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.product-stats-by-reviews.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+
+  # Aggregates all the clientresponses for each review
+  clientresponses-by-review-v2:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.ClientResponseByReviewAggregatorRule
+    input-streams:
+      emodb-clientresponse: $universe.legion.$region.megabus.clientresponse.avro
+    output-streams:
+      output-stream:        $universe.legion.$region.shared.clientresponses-by-review-v2.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+    config:
+      # This is based on the average record size (ClientResponse = 670 bytes) and a payload of 20MB.
+      max-aggr: 20000
+
+  # Aggregates all the flags for each piece of content
+  flags-by-content-v2:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.FlagsByContentAggregatorRule
+    input-streams:
+      emodb-flag: $universe.legion.$region.megabus.flag.avro
+    output-streams:
+      review-flags-output: $universe.legion.$region.shared.flags-by-review-v2.avro.$suffix
+      comment-flags-output: $universe.legion.$region.shared.flags-by-comment-v2.avro.$suffix
+      question-flags-output: $universe.legion.$region.shared.flags-by-question-v2.avro.$suffix
+      answer-flags-output: $universe.legion.$region.shared.flags-by-answer-v2.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+    config:
+      # This is based on the average record size (Flag = 986 bytes) and a payload of 20MB.
+      max-aggr:  20000
+
+  # Statistical Information about a product
+  product-counts:
+    type: rule
+    exec: 's3://$bucket/$space/nodes/rules-all/bin/$sha/rules-all.jar'
+    rule-class: com.bazaarvoice.legion.rule.shared.stats.ProductCountsRule
+    input-streams:
+      questions-approved-count-by-product: $universe.legion.$region.shared.questions-approved-count-by-product.avro
+      answers-approved-count-by-subject: $universe.legion.$region.shared.answers-approved-count-by-subject.avro
+      product-stats-by-reviews: $universe.legion.$region.shared.product-stats-by-reviews.avro
+    output-streams:
+      output-stream: $universe.legion.$region.shared.product-counts.avro.$suffix
+    streams-config:
+      num.stream.threads: 4
+

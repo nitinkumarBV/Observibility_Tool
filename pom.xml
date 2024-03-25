@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>Observibility_Tool</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+
+<!--        Shared -->
+        <dependency>
+            <groupId>com.bazaarvoice.legion</groupId>
+            <artifactId>shared-rules</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+<!--        splitter -->
+        <dependency>
+            <groupId>com.bazaarvoice.legion</groupId>
+            <artifactId>emodb-rules</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+<!--        concierge  -->
+        <dependency>
+            <groupId>com.bazaarvoice.concierge.legion</groupId>
+            <artifactId>legion-concierge-rules</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+<!--       managecontent  -->
+        <dependency>
+            <groupId>com.bazaarvoice.managecontent.legion</groupId>
+            <artifactId>managecontent-rules</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+<!--        oracle-streaming -->
+        <dependency>
+            <groupId>com.bazaarvoice.legion</groupId>
+            <artifactId>oraclestreaming-rules</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>LATEST</version>
+        </dependency>
+
+    </dependencies>
+
+</project>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        <!--    <properties>-->
+        <!--        <maven.compiler.source>11</maven.compiler.source>-->
+        <!--        <maven.compiler.target>11</maven.compiler.target>-->
+        <!--        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>-->
+        <!--    </properties>-->
